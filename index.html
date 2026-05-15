@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>木槌 &amp; 颜料 配色求解器</title>
+  <style>
+    :root {
+      --red:    #e74c3c;
+      --blue:   #3498db;
+      --green:  #27ae60;
+      --yellow: #e6b800;
+      --purple: #9b59b6;
+      --bg:     #f0f2f5;
+      --card:   #ffffff;
+      --text:   #2c3e50;
+      --muted:  #7f8c8d;
+      --border: #e0e0e0;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+      color: var(--text);
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    header h1 { font-size: 24px; margin-bottom: 4px; }
+    header p  { font-size: 13px; color: var(--muted); }
+
+    .container { width: 100%; max-width: 560px; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+    }
+    .card h2 { font-size: 17px; margin-bottom: 16px; }
+
+    /* ── Screens ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── Name inputs ── */
+    .name-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .badge {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 14px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input[type="text"]:focus { border-color: var(--blue); }
+
+    /* ── Color picker ── */
+    .char-block { margin-bottom: 18px; }
+    .char-block:last-child { margin-bottom: 0; }
+
+    .char-head {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 10px;
+    }
+    .char-head .name { font-weight: 600; font-size: 15px; }
+
+    .color-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 7px;
+    }
+    .color-label { width: 36px; font-size: 13px; color: var(--muted); flex-shrink: 0; }
+
+    .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .swatch {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 3px solid transparent;
+      outline: 2px solid transparent;
+      transition: transform .15s, opacity .15s, outline-color .15s;
+      flex-shrink: 0;
+    }
+    .swatch:hover:not(.disabled) { transform: scale(1.18); }
+    .swatch.selected {
+      outline-color: var(--text);
+      outline-offset: 2px;
+      transform: scale(1.12);
+    }
+    .swatch.disabled { opacity: .22; cursor: not-allowed; pointer-events: none; }
+
+    .swatch[data-c="red"]    { background: var(--red);    }
+    .swatch[data-c="blue"]   { background: var(--blue);   }
+    .swatch[data-c="green"]  { background: var(--green);  }
+    .swatch[data-c="yellow"] { background: var(--yellow); }
+    .swatch[data-c="purple"] { background: var(--purple); }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 9px 22px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: filter .15s, transform .1s;
+      font-weight: 600;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary   { background: var(--blue);   color: #fff; }
+    .btn-secondary { background: #ecf0f1; color: var(--text); }
+    .btn-primary:hover   { filter: brightness(1.08); }
+    .btn-secondary:hover { filter: brightness(.95); }
+
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+
+    /* ── Alerts ── */
+    .alert {
+      border-radius: 8px;
+      padding: 11px 14px;
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+    .alert-success { background: #d5f5e3; border: 1px solid #27ae60; color: #1e8449; font-weight: 600; }
+    .alert-error   { background: #fde8e8; border: 1px solid #e74c3c; color: #c0392b; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+    th { padding: 8px 10px; background: #f8f9fa; color: var(--muted); font-weight: 600; text-align: left; }
+    td { padding: 8px 10px; border-top: 1px solid #eee; }
+    td:first-child { color: var(--text); }
+
+    .dot {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+
+    .check { color: var(--green); font-weight: 700; }
+    .attack { color: var(--red);  font-weight: 600; }
+    .defend { color: var(--blue); font-weight: 600; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+    .section-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>木槌 &amp; 颜料 配色求解器</h1>
+  <p>角色排列：A – B – C – D – E（循环）· 每轮最多 31 步</p>
+</header>
+
+<div class="container">
+
+  <!-- ── Screen 1: Names ── -->
+  <div id="s-names" class="screen active">
+    <div class="card">
+      <h2>请输入五位角色的名字</h2>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+        名字在整局游戏中保持不变，留空则使用字母代替。
+      </p>
+      <div id="name-list"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="submitNames()">开始游戏 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen 2: Color input ── -->
+  <div id="s-colors" class="screen">
+    <div class="card">
+      <h2 id="round-heading"></h2>
+      <div id="color-list"></div>
+      <div id="color-err" class="alert alert-error" style="display:none"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="submitColors()">求解 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen 3: Solution ── -->
+  <div id="s-solution" class="screen">
+    <div id="sol-content"></div>
+    <div class="card">
+      <h2>下一步操作</h2>
+      <div class="btn-row">
+        <button class="btn btn-primary"   onclick="nextRound()">继续下一回合</button>
+        <button class="btn btn-secondary" onclick="restartGame()">重新开始（更换角色）</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Constants ──────────────────────────────────────────────────────────────
+  const CHARS   = ['A','B','C','D','E'];
+  const COLORS  = ['red','blue','green','yellow','purple'];
+  const ZH      = {red:'红', blue:'蓝', green:'绿', yellow:'黄', purple:'紫'};
+  const CSS_CLR = {red:'#e74c3c', blue:'#3498db', green:'#27ae60', yellow:'#e6b800', purple:'#9b59b6'};
+  const N = 5, MAX = 31;
+
+  let names   = [...CHARS];
+  let round   = 1;
+  let selS    = Array(N).fill(null);   // selected sticks
+  let selB    = Array(N).fill(null);   // selected buckets
+
+  // ── BFS ───────────────────────────────────────────────────────────────────
+  function act(S, B, i, a) {
+    S = [...S]; B = [...B];
+    if (a === 0) {
+      const r = (i+1)%N, l = (i+3)%N;
+      [S[i],S[r]] = [S[r],S[i]];
+      [B[i],B[l]] = [B[l],B[i]];
+    } else {
+      const r = (i+2)%N, l = (i+4)%N;
+      [S[i],S[r]] = [S[r],S[i]];
+      [B[i],B[l]] = [B[l],B[i]];
+    }
+    return [S, B];
+  }
+
+  function goal(S, B) { return S.every((s,i) => s === B[i]); }
+  function key(S, B)  { return S.join()+' '+B.join(); }
+
+  function bfs(S0, B0) {
+    if (goal(S0, B0)) return [];
+    const q = [[S0, B0, []]], seen = new Set([key(S0,B0)]);
+    while (q.length) {
+      const [S, B, path] = q.shift();
+      if (path.length >= MAX) continue;
+      for (let ci = 0; ci < N; ci++) for (let a = 0; a < 2; a++) {
+        const [nS, nB] = act(S, B, ci, a), k = key(nS, nB);
+        if (!seen.has(k)) {
+          seen.add(k);
+          const np = [...path, [ci, a]];
+          if (goal(nS, nB)) return np;
+          q.push([nS, nB, np]);
+        }
+      }
+    }
+    return null;
+  }
+
+  // ── Screen helpers ─────────────────────────────────────────────────────────
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  // ── Screen 1 ──────────────────────────────────────────────────────────────
+  function buildNames() {
+    document.getElementById('name-list').innerHTML = CHARS.map((c, i) => `
+      <div class="name-row">
+        <div class="badge">${c}</div>
+        <input type="text" id="n${c}" placeholder="角色 ${c} 的名字（可留空）"
+               value="${names[i] !== c ? names[i] : ''}">
+      </div>`).join('');
+  }
+
+  function submitNames() {
+    names = CHARS.map((c, i) => document.getElementById('n'+c).value.trim() || c);
+    round = 1;
+    buildColors();
+    show('s-colors');
+  }
+
+  // ── Screen 2 ──────────────────────────────────────────────────────────────
+  function buildColors() {
+    document.getElementById('round-heading').textContent = `第 ${round} 回合 — 请选择各角色颜色`;
+    selS = Array(N).fill(null);
+    selB = Array(N).fill(null);
+
+    document.getElementById('color-list').innerHTML = CHARS.map((c, i) => `
+      <div class="char-block">
+        <div class="char-head">
+          <div class="badge">${c}</div>
+          <div class="name">${names[i]}</div>
+        </div>
+        <div class="color-row">
+          <span class="color-label">木槌</span>
+          <div class="swatches" id="ss${i}">
+            ${COLORS.map(col => `<div class="swatch" data-c="${col}"
+              onclick="pick('s',${i},'${col}')" title="${ZH[col]}"></div>`).join('')}
+          </div>
+        </div>
+        <div class="color-row">
+          <span class="color-label">颜料</span>
+          <div class="swatches" id="bs${i}">
+            ${COLORS.map(col => `<div class="swatch" data-c="${col}"
+              onclick="pick('b',${i},'${col}')" title="${ZH[col]}"></div>`).join('')}
+          </div>
+        </div>
+        ${i < N-1 ? '<hr>' : ''}
+      </div>`).join('');
+
+    document.getElementById('color-err').style.display = 'none';
+    refreshSwatches();
+  }
+
+  function pick(type, i, col) {
+    if (type === 's') selS[i] = col;
+    else              selB[i] = col;
+    refreshSwatches();
+  }
+
+  function refreshSwatches() {
+    for (let i = 0; i < N; i++) {
+      const usedS = selS.filter((c,j) => j !== i && c);
+      const usedB = selB.filter((c,j) => j !== i && c);
+      document.querySelectorAll(`#ss${i} .swatch`).forEach(el => {
+        const c = el.dataset.c;
+        el.classList.toggle('selected', selS[i] === c);
+        el.classList.toggle('disabled', usedS.includes(c));
+      });
+      document.querySelectorAll(`#bs${i} .swatch`).forEach(el => {
+        const c = el.dataset.c;
+        el.classList.toggle('selected', selB[i] === c);
+        el.classList.toggle('disabled', usedB.includes(c));
+      });
+    }
+  }
+
+  function submitColors() {
+    const missing = CHARS.filter((_, i) => !selS[i] || !selB[i])
+                         .map((_, i) => names[i]);
+    if (missing.length) {
+      const err = document.getElementById('color-err');
+      err.textContent = `请为所有角色选择颜色（未完成：${missing.join('、')}）`;
+      err.style.display = 'block';
+      return;
+    }
+    document.getElementById('color-err').style.display = 'none';
+    const Si = selS.map(c => COLORS.indexOf(c));
+    const Bi = selB.map(c => COLORS.indexOf(c));
+    renderSolution(bfs(Si, Bi), Si, Bi);
+    show('s-solution');
+  }
+
+  // ── Screen 3 ──────────────────────────────────────────────────────────────
+  function dot(col) {
+    return `<span class="dot" style="background:${CSS_CLR[col]}"></span>${ZH[col]}`;
+  }
+
+  function stateTable(S, B, label) {
+    const rows = CHARS.map((c,i) => `<tr>
+      <td>${names[i]}<span style="color:#bbb;font-size:12px"> (${c})</span></td>
+      <td>${dot(COLORS[S[i]])}</td>
+      <td>${dot(COLORS[B[i]])}</td>
+      <td>${S[i]===B[i] ? '<span class="check">✓</span>' : ''}</td>
+    </tr>`).join('');
+    return `<p class="section-label">${label}</p>
+      <table><tr><th>角色</th><th>木槌</th><th>颜料</th><th></th></tr>${rows}</table>`;
+  }
+
+  function renderSolution(sol, Si, Bi) {
+    const el = document.getElementById('sol-content');
+
+    if (sol === null) {
+      el.innerHTML = `<div class="card">
+        <div class="alert alert-error">未能在 ${MAX} 步内找到解法。此配置可能不是合法的游戏初始状态。</div>
+        ${stateTable(Si, Bi, '输入状态')}
+      </div>`;
+      return;
+    }
+
+    if (sol.length === 0) {
+      el.innerHTML = `<div class="card">
+        <div class="alert alert-success">✓ 所有角色颜色已匹配，无需操作！</div>
+        ${stateTable(Si, Bi, '当前状态')}
+      </div>`;
+      return;
+    }
+
+    let S = [...Si], B = [...Bi];
+    const stepRows = sol.map(([ci, a], idx) => {
+      const label = a === 0 ? '攻击' : '防御';
+      const cls   = a === 0 ? 'attack' : 'defend';
+      const row = `<tr>
+        <td style="color:#bbb">${idx+1}</td>
+        <td>${names[ci]}<span style="color:#bbb;font-size:12px"> (${CHARS[ci]})</span></td>
+        <td class="${cls}">${label}</td>
+      </tr>`;
+      [S, B] = act(S, B, ci, a);
+      return row;
+    }).join('');
+
+    el.innerHTML = `<div class="card">
+      <div class="alert alert-success">✓ 最优解法：${sol.length} 步</div>
+      <table>
+        <tr><th>步骤</th><th>角色</th><th>动作</th></tr>
+        ${stepRows}
+      </table>
+      <hr>
+      ${stateTable(S, B, '最终状态')}
+    </div>`;
+  }
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+  function nextRound()   { round++; buildColors(); show('s-colors'); }
+  function restartGame() { buildNames(); show('s-names'); }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  buildNames();
+</script>
+</body>
+</html>
